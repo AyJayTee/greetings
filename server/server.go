@@ -7,11 +7,11 @@ import (
 	"github.com/AyJayTee/greetings/lib"
 )
 
-func ServiceStart() {
+func ServiceStart(port string) {
 	http.HandleFunc("/helloworld", helloWorld)
 	http.HandleFunc("/", hello)
 
-	http.ListenAndServe("localhost:8080", nil)
+	http.ListenAndServe(port, nil)
 }
 
 func helloWorld(w http.ResponseWriter, r *http.Request) {

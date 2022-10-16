@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/AyJayTee/greetings/lib"
+	"github.com/AyJayTee/greetings"
 )
 
 func ServiceStart(port string) {
@@ -15,7 +15,7 @@ func ServiceStart(port string) {
 }
 
 func helloWorld(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello World!")
+	fmt.Fprintln(w, "Hello World edited!")
 }
 
 func hello(w http.ResponseWriter, r *http.Request) {
@@ -25,5 +25,5 @@ func hello(w http.ResponseWriter, r *http.Request) {
 		name = "World"
 	}
 
-	fmt.Fprintln(w, lib.Hello(name))
+	fmt.Fprintln(w, greetings.Hello(name))
 }

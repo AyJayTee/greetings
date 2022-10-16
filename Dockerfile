@@ -1,7 +1,7 @@
-FROM golang:1.19
+FROM alpine
 
 WORKDIR /usr/src/app
 
-COPY . .
+COPY /bin/http/main .
 
-CMD ["go", "run", "main.go"]
+CMD [ "./main" ]

@@ -15,7 +15,7 @@ func ServiceStart(port string) {
 }
 
 func helloWorld(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello World edited!")
+	fmt.Fprintln(w, "Hello World!")
 }
 
 func hello(w http.ResponseWriter, r *http.Request) {

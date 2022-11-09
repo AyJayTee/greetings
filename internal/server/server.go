@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/AyJayTee/greetings"
+	"github.com/AyJayTee/greetings/internal/database"
 )
 
 type StoreURL struct {
@@ -19,32 +19,26 @@ type ReturnURL struct {
 	Url string `json:"url"`
 }
 
-type Database struct {
-	data []string
-}
-
 func ServiceStart(port string) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/helloworld", helloWorld)
 
-	s := &Database{
-		data: make([]string, 0),
-	}
+	db := database.StartDatabase()
 
 	// POST /store {"url": "http://medium.com"}
 	// {"url": "http://localhost:8080/id/abc123"}
-	mux.Handle("/store", storeHandler(s))
+	mux.Handle("/store", storeHandler(db))
 
 	// GET /id/abc123
 	// Status 302 location: http://medium.com
-	mux.Handle("/id/", idHandler(s))
+	mux.Handle("/id/", idHandler(db))
 
 	mux.HandleFunc("/", hello)
 
 	http.ListenAndServe(port, auth("user", "pass", logging(mux)))
 }
 
-func storeHandler(store *Database) http.Handler {
+func storeHandler(db *database.Database) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		// Guard clause
@@ -60,19 +54,15 @@ func storeHandler(store *Database) http.Handler {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		// Validation
-		if storeUrl.Url == "" {
-			w.WriteHeader(http.StatusBadRequest)
+
+		id, err := db.AddUrl(storeUrl.Url)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if !strings.HasPrefix(storeUrl.Url, "https://") {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		store.data = append(store.data, storeUrl.Url)
 
 		// Create unique ID
-		returnUrl := ReturnURL{Url: fmt.Sprintf("http://localhost:8080/id/%d", len(store.data))}
+		returnUrl := ReturnURL{Url: fmt.Sprintf("http://localhost:8080/id/%d", id)}
 
 		// Return JSON payload
 		if err := json.NewEncoder(w).Encode(returnUrl); err != nil {
@@ -82,7 +72,7 @@ func storeHandler(store *Database) http.Handler {
 	})
 }
 
-func idHandler(store *Database) http.Handler {
+func idHandler(db *database.Database) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Guard clause
@@ -91,22 +81,24 @@ func idHandler(store *Database) http.Handler {
 				return
 			}
 
-			// Read abc123 from path
+			// Read id from path
 			path := r.URL.Path[4:]
+
 			// Guard
-			i, err := strconv.Atoi(path)
+			id, err := strconv.Atoi(path)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			if i > len(store.data) {
-				log.Printf("OUt of bounds, %d, %d", i, len(store.data))
-				w.WriteHeader(http.StatusBadRequest)
+
+			// Fetch url from database
+			url, err := db.FetchUrl(id)
+			if err != nil {
+				log.Println(err)
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			// Guard
-			url := store.data[i-1]
 
 			// Set status and location header
 			w.Header().Set("Location", url)

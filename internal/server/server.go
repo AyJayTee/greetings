@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/AyJayTee/greetings"
-	"github.com/AyJayTee/greetings/internal/database"
+	"github.com/AyJayTee/greetings/internal/postgres"
 )
 
 type StoreURL struct {
@@ -21,24 +20,22 @@ type ReturnURL struct {
 
 func ServiceStart(port string) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/helloworld", helloWorld)
 
-	db := database.StartDatabase()
+	db := postgres.NewDatabase([]string{"https://google.com", "https://medium.com"})
+	s := greetings.NewService(db)
 
 	// POST /store {"url": "http://medium.com"}
 	// {"url": "http://localhost:8080/id/abc123"}
-	mux.Handle("/store", storeHandler(db))
+	mux.Handle("/store", storeHandler(s))
 
 	// GET /id/abc123
 	// Status 302 location: http://medium.com
-	mux.Handle("/id/", idHandler(db))
-
-	mux.HandleFunc("/", hello)
+	mux.Handle("/id/", idHandler(s))
 
 	http.ListenAndServe(port, auth("user", "pass", logging(mux)))
 }
 
-func storeHandler(db *database.Database) http.Handler {
+func storeHandler(db *greetings.Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		// Guard clause
@@ -55,14 +52,14 @@ func storeHandler(db *database.Database) http.Handler {
 			return
 		}
 
-		id, err := db.AddUrl(storeUrl.Url)
+		id, err := db.Add(storeUrl.Url)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Create unique ID
-		returnUrl := ReturnURL{Url: fmt.Sprintf("http://localhost:8080/id/%d", id)}
+		returnUrl := ReturnURL{Url: fmt.Sprintf("http://localhost:8080/id/%s", id)}
 
 		// Return JSON payload
 		if err := json.NewEncoder(w).Encode(returnUrl); err != nil {
@@ -72,7 +69,7 @@ func storeHandler(db *database.Database) http.Handler {
 	})
 }
 
-func idHandler(db *database.Database) http.Handler {
+func idHandler(db *greetings.Service) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Guard clause
@@ -84,16 +81,8 @@ func idHandler(db *database.Database) http.Handler {
 			// Read id from path
 			path := r.URL.Path[4:]
 
-			// Guard
-			id, err := strconv.Atoi(path)
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
 			// Fetch url from database
-			url, err := db.FetchUrl(id)
+			url, err := db.Fetch(path)
 			if err != nil {
 				log.Println(err)
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -105,21 +94,6 @@ func idHandler(db *database.Database) http.Handler {
 			w.WriteHeader(http.StatusFound)
 		})
 }
-
-func helloWorld(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello World!")
-}
-
-func hello(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Path[1:]
-
-	if name == "" {
-		name = "World"
-	}
-
-	fmt.Fprintln(w, greetings.Hello(name))
-}
-
 func auth(user, password string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		usr, pwd, ok := r.BasicAuth()

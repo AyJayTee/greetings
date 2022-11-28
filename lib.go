@@ -1,27 +1,21 @@
 package greetings
 
-import (
-	"fmt"
-	"math/rand"
-	"time"
-)
+import "github.com/AyJayTee/greetings/internal/repository"
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
+type Service struct {
+	db repository.Repository
 }
 
-func Hello(name string) string {
-	if name == "" {
-		return ""
+func NewService(r repository.Repository) *Service {
+	return &Service{
+		db: r,
 	}
-
-	return fmt.Sprintf(message(), name)
 }
 
-func message() string {
-	formats := []string{"Hello %s!", "Welcome %s!", "Hi %s!"}
+func (s *Service) Add(url string) (string, error) {
+	return s.db.AddUrl(url)
+}
 
-	index := rand.Intn(len(formats))
-
-	return formats[index]
+func (s *Service) Fetch(id string) (string, error) {
+	return s.db.FetchUrl(id)
 }
